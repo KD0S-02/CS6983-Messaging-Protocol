@@ -56,6 +56,8 @@ func (g *Gateway) HandlePUT(key string, value []byte) error {
 		locs[r.idx] = proto.Location{SSD: r.idx, LBA: r.lba}
 	}
 	if firstErr != nil {
+		// clear the phase1 without installing metadata
+		go g.broadcastPhase2(key, seq, locs, 0, firstErr)
 		return firstErr
 	}
 
@@ -64,22 +66,31 @@ func (g *Gateway) HandlePUT(key string, value []byte) error {
 		Locations: locs,
 		Length:    uint32(len(value)),
 		Seq:       seq,
+		// adding gateway
+		GatewayID: g.ID,
 	})
 
 	// Phase 2 async — PUT is complete from the client's perspective
-	go g.broadcastPhase2(key, seq, locs, uint32(len(value)))
+	go g.broadcastPhase2(key, seq, locs, uint32(len(value)), nil)
 
 	return nil
 }
 
-func (g *Gateway) broadcastPhase2(key string, seq uint64, locs [3]proto.Location, length uint32) {
+func (g *Gateway) broadcastPhase2(key string, seq uint64, locs [3]proto.Location, length uint32, writeErr error) {
+	errText := ""
+	if writeErr != nil {
+		errText = writeErr.Error()
+	}
+
 	msg := proto.Phase2Msg{
 		GatewayID: g.ID,
 		Seq:       seq,
 		Key:       key,
 		Locations: locs,
 		Length:    length,
+		Err:       errText,
 	}
+
 	for _, p := range g.peers {
 		p := p
 		go func() {
@@ -103,8 +114,24 @@ func (g *Gateway) HandleGET(key string) ([]byte, error) {
 		return nil, ErrNotFound
 	}
 
-	loc := entry.Locations[0]
-	return g.ssds[loc.SSD].Read(loc.LBA)
+	//loc := entry.Locations[0]
+	//return g.ssds[loc.SSD].Read(loc.LBA)
+	var lastErr error
+	for _, loc := range entry.Locations {
+		if int(loc.SSD) >= len(g.ssds) || g.ssds[loc.SSD] == nil {
+			continue
+		}
+
+		value, err := g.ssds[loc.SSD].Read(loc.LBA)
+		if err == nil {
+			return value, nil
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, ErrNotFound
 }
 
 func (g *Gateway) OnPhase1(msg proto.Phase1Msg) {
@@ -117,9 +144,14 @@ func (g *Gateway) OnPhase1(msg proto.Phase1Msg) {
 
 func (g *Gateway) OnPhase2(msg proto.Phase2Msg) {
 	g.ow.Remove(msg.GatewayID, msg.Seq, msg.Key)
+
+	if msg.Err != "" {
+		return
+	}
 	g.idx.SetIfNewer(msg.Key, IndexEntry{
 		Locations: msg.Locations,
 		Length:    msg.Length,
 		Seq:       msg.Seq,
+		GatewayID: msg.GatewayID,
 	})
 }

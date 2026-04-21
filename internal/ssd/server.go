@@ -70,7 +70,8 @@ func (s *Server) handle(conn net.Conn) {
 			val, err := s.ssd.Read(req.LBA)
 			resp := proto.ReadResp{Value: val}
 			if err != nil {
-				if !errors.Is(err, proto.ErrNotFound) {
+				//if !errors.Is(err, proto.ErrNotFound) {
+				if !errors.Is(err, ErrNotFound) {
 					log.Printf("ssd-%d: read lba=%d: %v", s.ssd.ID, req.LBA, err)
 				}
 				resp.Err = err.Error()

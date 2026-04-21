@@ -23,7 +23,8 @@ func (s *PeerServer) ListenAndServe() error {
 	if err != nil {
 		return fmt.Errorf("gateway-%d peer server listen %s: %w", s.gw.ID, s.addr, err)
 	}
-	log.Printf("gateway-%d peer listener on %s", &s.gw.ID, s.addr)
+	//log.Printf("gateway-%d peer listener on %s", &s.gw.ID, s.addr)
+	log.Printf("gateway-%d peer listener on %s", s.gw.ID, s.addr)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

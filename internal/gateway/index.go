@@ -10,6 +10,8 @@ type IndexEntry struct {
 	Locations [3]proto.Location
 	Length    uint32
 	Seq       uint64
+	// Adding extra element
+	GatewayID uint8
 }
 
 type Index struct {
@@ -38,7 +40,17 @@ func (ix *Index) SetIfNewer(key string, e IndexEntry) {
 	ix.mu.Lock()
 	defer ix.mu.Unlock()
 	existing, ok := ix.entries[key]
-	if !ok || e.Seq > existing.Seq {
+	//if !ok || e.Seq > existing.Seq {
+	//	ix.entries[key] = e
+	//}
+	if !ok || isNewerEntry(e, existing) {
 		ix.entries[key] = e
 	}
+}
+
+func isNewerEntry(candidate, existing IndexEntry) bool {
+	if candidate.Seq != existing.Seq {
+		return candidate.Seq > existing.Seq
+	}
+	return candidate.GatewayID > existing.GatewayID
 }

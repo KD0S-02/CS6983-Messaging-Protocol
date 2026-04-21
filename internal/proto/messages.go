@@ -23,6 +23,8 @@ type Phase2Msg struct {
 	Key       string
 	Locations [3]Location
 	Length    uint32
+	// additional val
+	Err string
 }
 
 type AppendReq struct {

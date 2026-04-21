@@ -20,6 +20,18 @@ func NewSSDClient(addr string) *SSDClient {
 	return &SSDClient{addr: addr}
 }
 
+// error type hold
+type applicationError struct {
+	err error
+}
+
+func (e applicationError) Error() string { return e.err.Error() }
+func (e applicationError) Unwrap() error { return e.err }
+
+func nonRetryable(err error) error {
+	return applicationError{err: err}
+}
+
 func (c *SSDClient) dial() error {
 	conn, err := net.DialTimeout("tcp", c.addr, 3*time.Second)
 	if err != nil {
@@ -44,6 +56,10 @@ func (c *SSDClient) do(fn func(net.Conn) error) error {
 			}
 		}
 		if err := fn(c.conn); err != nil {
+			var appErr applicationError
+			if errors.As(err, &appErr) {
+				return appErr.err
+			}
 			c.conn.Close()
 			c.conn = nil
 			lastErr = err
@@ -74,8 +90,11 @@ func (c *SSDClient) Append(key string, value []byte) (uint64, error) {
 		if err := proto.ReadPayload(conn, &resp); err != nil {
 			return err
 		}
+		//if resp.Err != "" {
+		//	return errors.New(resp.Err)
+		//}
 		if resp.Err != "" {
-			return errors.New(resp.Err)
+			return nonRetryable(errors.New(resp.Err))
 		}
 		lba = resp.LBA
 		return nil
@@ -101,7 +120,7 @@ func (c *SSDClient) Read(lba uint64) ([]byte, error) {
 			return err
 		}
 		if resp.Err != "" {
-			return errors.New(resp.Err)
+			return nonRetryable(errors.New(resp.Err))
 		}
 		value = resp.Value
 		return nil

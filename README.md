@@ -43,10 +43,6 @@ git clone https://github.com/KD0S-02/CS6983-Messaging-Protocol.git
 
 Go into the project root:
 
-```powershell
-cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
-```
-
 Most commands in this README should be run from the repository root.
 
 ## Quick test
@@ -438,36 +434,6 @@ The Makefile shortcut is:
 make fmt
 make test
 ```
-
-## Development workflow
-
-A simple workflow for local changes:
-
-```powershell
-cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
-
-git status
-
-gofmt -w internal/proto internal/ssd internal/transport internal/gateway cmd/devcluster
-go test ./...
-
-git add README.md Makefile .gitignore cmd internal
-git commit -m "Describe your change"
-git pull --rebase origin main
-git push origin main
-```
-
-If you only want to stage specific files, use `git add path/to/file.go` instead of adding a whole folder.
-
-Do not commit local runtime data:
-
-```text
-data/
-coverage.out
-```
-
-Those should be listed in `.gitignore`.
-
 ## Troubleshooting
 
 ### `go test` tries to download another Go toolchain
@@ -477,10 +443,6 @@ The project declares its Go version in `go.mod`. If your installed Go version do
 ### `package ... is not in std`
 
 Make sure you are running commands from the repository root:
-
-```powershell
-cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
-```
 
 Then run:
 

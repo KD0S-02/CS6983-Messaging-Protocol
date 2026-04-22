@@ -2,8 +2,6 @@
 #
 # Run all make commands from the repository root:
 #
-#   C:\Users\prana\OneDrive\Desktop\CS6983-Messaging-Protocol
-#
 # Common examples:
 #
 #   make help

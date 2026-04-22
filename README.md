@@ -1,22 +1,36 @@
 # CS6983 Messaging Protocol
 
-A replicated messaging/storage protocol implemented in Go. The code is broken down into internal packages for the wire protocol, SSD storage nodes, network clients, gateway coordination, a small runnable local cluster, and regression testing.
+A replicated messaging/storage protocol implemented in Go. The project is split into packages for the wire protocol, SSD-style storage nodes, transport clients, gateway coordination, a runnable local development cluster, and regression tests.
 
-The project can be used in two ways:
+This repository can be used in two ways:
 
-- run the package tests with `go test ./...`
-- run a local development cluster with `go run ./cmd/devcluster -http 127.0.0.1:18080`
+1. Run the full test suite with `go test ./...`.
+2. Start a local dev cluster with `cmd/devcluster` and test the system through a small HTTP API.
 
-## Requirements
+## Environment used
 
-- Go `1.25.5` or the version listed in `go.mod`
+The project was developed and tested with the following setup:
+
+- Go version listed in `go.mod` (`1.25.5` in this repository)
 - Git
-- A terminal such as PowerShell, Command Prompt, Git Bash, or WSL
+- Windows with PowerShell
+- Local TCP ports for the dev cluster:
+  - HTTP API: `127.0.0.1:18080`
+  - SSD servers: `127.0.0.1:9100`, `127.0.0.1:9101`, `127.0.0.1:9102`
+  - Gateway peer listeners: `127.0.0.1:9201`, `127.0.0.1:9202`
+
+Other terminals such as Command Prompt, Git Bash, WSL, macOS Terminal, or Linux shell should also work, but the examples below use PowerShell syntax.
 
 Check your Go install:
 
 ```powershell
 go version
+```
+
+Check Git:
+
+```powershell
+git --version
 ```
 
 ## Getting the code
@@ -27,15 +41,15 @@ Clone the repository:
 git clone https://github.com/KD0S-02/CS6983-Messaging-Protocol.git
 ```
 
-Go into the repository root:
+Go into the project root:
 
 ```powershell
-cd C:\Users\prana\OneDrive\Desktop\CS6983-Messaging-Protocol
+cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
 ```
 
-Most commands in this README should be run from that root folder.
+Most commands in this README should be run from the repository root.
 
-## Quick check
+## Quick test
 
 Run the whole test suite:
 
@@ -73,55 +87,40 @@ Generate coverage:
 go test ./... -cover
 ```
 
-Generate a coverage profile:
+Generate a coverage profile and open the HTML view:
 
 ```powershell
 go test ./... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
-## Running the local dev cluster
+## Building and running the system
 
-The repository includes a runnable development command at:
+The runnable entry point is:
 
 ```text
 cmd/devcluster/main.go
 ```
 
-This command starts:
+It starts:
 
 - 3 local SSD servers
 - 2 gateway peer servers by default
-- an HTTP API for basic PUT and GET requests
+- an HTTP API for client-facing `PUT` and `GET` requests
 
-Use port `18080` for the HTTP API to avoid common conflicts with other local services on port `8080`.
+### Option 1: run directly with Go
 
-### Terminal 1: start the cluster
+Use port `18080` for the HTTP API. This avoids common conflicts with other services on port `8080`.
 
-Open a PowerShell terminal and run:
+Terminal 1:
 
 ```powershell
-cd C:\Users\prana\OneDrive\Desktop\CS6983-Messaging-Protocol
-
 go run ./cmd/devcluster -http 127.0.0.1:18080
 ```
 
-Leave this terminal open while testing. The server is running correctly if it stays open and shows logs similar to:
+Leave Terminal 1 running. You should see logs for the SSD servers, gateway peer listeners, and HTTP API.
 
-```text
-ssd-0 listening on 127.0.0.1:9100 datadir=data\devcluster\ssd-0
-ssd-1 listening on 127.0.0.1:9101 datadir=data\devcluster\ssd-1
-ssd-2 listening on 127.0.0.1:9102 datadir=data\devcluster\ssd-2
-gateway-1 peer listener on 127.0.0.1:9201
-gateway-2 peer listener on 127.0.0.1:9202
-HTTP API listening on http://127.0.0.1:18080
-```
-
-### Terminal 2: test the API
-
-Open a second PowerShell terminal and run the commands below from anywhere.
-
-Check health:
+Terminal 2:
 
 ```powershell
 curl.exe http://127.0.0.1:18080/healthz
@@ -139,22 +138,10 @@ Write a value through gateway 1:
 curl.exe -X PUT --data-binary "hello world" http://127.0.0.1:18080/gateways/1/kv/demo
 ```
 
-Expected response:
-
-```json
-{"bytes":11,"gateway":1,"key":"demo","status":"ok"}
-```
-
-Read the value back through gateway 1:
+Read the value through gateway 1:
 
 ```powershell
 curl.exe http://127.0.0.1:18080/gateways/1/kv/demo
-```
-
-Expected response:
-
-```text
-hello world
 ```
 
 Read the same value through gateway 2:
@@ -163,52 +150,273 @@ Read the same value through gateway 2:
 curl.exe http://127.0.0.1:18080/gateways/2/kv/demo
 ```
 
-Expected response:
-
-```text
-hello world
-```
-
-Show the local cluster configuration:
+Show cluster information:
 
 ```powershell
 curl.exe http://127.0.0.1:18080/gateways
 ```
 
-### Useful devcluster flags
+Stop the cluster by pressing `Ctrl + C` in Terminal 1.
 
-Run with 3 gateways:
+### Option 2: build an executable
 
-```powershell
-go run ./cmd/devcluster -http 127.0.0.1:18080 -gateways 3
-```
-
-Run with SSD latency simulation:
+Create a local `bin` directory:
 
 ```powershell
-go run ./cmd/devcluster -http 127.0.0.1:18080 -latency-ms 100 -jitter-ms 50
+New-Item -ItemType Directory -Force .\bin
 ```
 
-Run with injected SSD failures:
+Build the dev cluster command:
 
 ```powershell
-go run ./cmd/devcluster -http 127.0.0.1:18080 -fail-rate 0.1
+go build -o .\bin\devcluster.exe ./cmd/devcluster
 ```
 
-Use a different data directory:
+Run it:
 
 ```powershell
-go run ./cmd/devcluster -http 127.0.0.1:18080 -data ./tmp/devcluster
+.\bin\devcluster.exe -http 127.0.0.1:18080
 ```
 
-Use completely different SSD, peer, and HTTP ports:
+Then use the same `curl.exe` commands from a second terminal.
+
+## Makefile
+
+The `Makefile` is a shortcut file for the most common commands. It wraps the same commands used in this README, including formatting, tests, coverage, running the dev cluster, API checks, cleanup, and Git workflow commands.
+
+Show all available targets:
 
 ```powershell
-go run ./cmd/devcluster `
-  -http 127.0.0.1:18080 `
-  -ssd-addrs 127.0.0.1:19100,127.0.0.1:19101,127.0.0.1:19102 `
-  -peer-addrs 127.0.0.1:19201,127.0.0.1:19202
+make help
 ```
+
+Common targets:
+
+```powershell
+make fmt
+make test
+make test-v
+make test-race
+make cover
+make cover-html
+```
+
+Run the local dev cluster on `127.0.0.1:18080`:
+
+```powershell
+make run
+```
+
+In a second terminal, test the API:
+
+```powershell
+make api-health
+make api-put VALUE="hello world" KEY=demo
+make api-get-gw1 KEY=demo
+make api-get-gw2 KEY=demo
+make api-info
+```
+
+Run the whole API demo sequence:
+
+```powershell
+make api-demo
+```
+
+Run package-specific tests:
+
+```powershell
+make test-proto
+make test-ssd
+make test-transport
+make test-gateway
+make test-devcluster
+```
+
+Run one specific test:
+
+```powershell
+make test-one PKG=./internal/gateway TEST=TestEndToEndPutOnGateway1ReadableFromGateway2
+```
+
+Clean generated runtime files:
+
+```powershell
+make clean
+```
+
+Git helper targets are also included:
+
+```powershell
+make git-status
+make git-add
+make git-commit MSG="Describe your change"
+make git-pull
+make git-push
+```
+
+If `make` is not installed on your machine, use the direct `go`, `curl.exe`, and `git` commands shown in the README instead.
+
+## Design overview
+
+The main design decision was to keep the project split into small internal packages instead of putting everything into one large file. Each package has one job:
+
+- `internal/proto` defines the message structs and frame format used over TCP.
+- `internal/ssd` implements the local file-backed SSD simulation and SSD TCP server.
+- `internal/transport` contains clients for gateway-to-SSD and gateway-to-gateway communication.
+- `internal/gateway` contains the main replicated write/read coordination logic.
+- `cmd/devcluster` wires the packages together into a runnable local system.
+
+The storage layer is intentionally simple. Each SSD stores values in block files and returns a logical block address. The gateway layer owns the key-to-location index and is responsible for coordinating writes with peer gateways.
+
+A write through `HandlePUT` does the following:
+
+1. assigns a gateway-local sequence number,
+2. sends Phase1 to peer gateways to mark the key as pending,
+3. appends the value to all three SSD replicas,
+4. updates the local gateway index,
+5. sends Phase2 to peers with the final replica locations.
+
+A read through `HandleGET` checks whether a peer write is pending, waits for Phase2 if needed, looks up the key in the local index, and then reads from one of the available replicas.
+
+A few important design choices:
+
+- TCP is used directly instead of HTTP or gRPC for internal gateway/SSD traffic.
+- Messages are encoded with Go `gob` and wrapped in a small custom frame.
+- SSD nodes are dumb storage nodes; gateways manage metadata and coordination.
+- Values are replicated to three SSD servers.
+- Reads can fall back to another replica if the first replica fails.
+- Failed writes send a cleanup Phase2 message so peer gateways do not stay stuck in a pending state.
+- Gateway metadata is in memory for this prototype; SSD block files are persisted under `data/` during devcluster runs.
+
+## Repository layout
+
+```text
+.
+├── cmd
+│   └── devcluster
+│       ├── main.go
+│       └── main_test.go
+├── go.mod
+├── Makefile
+├── README.md
+└── internal
+    ├── gateway
+    ├── proto
+    ├── ssd
+    └── transport
+```
+
+The code is intended to be used inside this module rather than directly imported by external modules. This is why the project uses `internal/` packages.
+
+## File map
+
+### Root
+
+- `go.mod` — module name and Go version for the project.
+- `Makefile` — shortcut commands for testing, formatting, running the dev cluster, API checks, cleanup, and Git workflow.
+- `README.md` — setup, build, run, testing, design, and troubleshooting notes.
+
+### `cmd/devcluster`
+
+- `main.go` — starts local SSD servers, gateway peer servers, wires peers together, and exposes the HTTP API.
+- `main_test.go` — tests command helper functions, path parsing, cluster info, and basic HTTP routes.
+
+### `internal/proto`
+
+- `messages.go` — contains the shared protocol structs for gateway phases, SSD reads/writes, and replica locations.
+- `framing.go` — holds the TCP frame encoding/decoding using a 1-byte message type, 4-byte payload length, and gob payload.
+- `errors.go` — contains the shared protocol-level errors.
+- `framing_test.go` — holds the basic protocol round-trip tests and truncated payload checks.
+- `framing_edge_cases_test.go` — holds the malformed payload, EOF, multiple-message stream, and gob encode error tests.
+
+### `internal/ssd`
+
+- `ssd.go` — holds the file-backed SSD implementation with append, read, block files, and LBA recovery.
+- `server.go` — contains the TCP server that exposes SSD append/read operations using the protocol package.
+- `config.go` — holds the latency, jitter, and failure-injection settings for SSD operations.
+- `errors.go` — holds the SSD-specific errors such as missing blocks and injected failures.
+- `ssd_test.go` — contains the basic SSD append/read, restart recovery, and not-found tests.
+- `ssd_edge_cases_test.go` — contains the binary data, empty values, concurrent appends, malformed blocks, and recovery edge cases.
+
+### `internal/transport`
+
+- `ssd_client.go` — holds the gateway-side client for sending append/read requests to SSD servers.
+- `peer_client.go` — holds the gateway-side client for sending Phase1 and Phase2 messages to peer gateways.
+- `pool.go` — contains the small TCP connection pool helper.
+- `ssd_client_test.go` — verifies SSD client behavior around application-level errors.
+- `transport_edge_cases_test.go` — contains the integration tests for SSD client/server traffic, reconnects, peer sends, and connection pool behavior.
+
+### `internal/gateway`
+
+- `gateway.go` — holds the gateway struct, constructor, sequence counter, SSD clients, peer clients, index, and outstanding-write tracker.
+- `handler.go` — handles PUT/GET requests, peer Phase1/Phase2 messages, failed-write cleanup, and replica fallback reads.
+- `index.go` — contains the in-memory key-to-location index with version comparison using sequence number and gateway ID.
+- `outstanding.go` — holds pending-write tracking, waiter registration, completion handling, and timeout cleanup.
+- `peer_server.go` — contains the TCP listener for incoming peer gateway messages.
+- `gateway_e2e_test.go` — holds end-to-end gateway tests for PUT/GET, peer propagation, pending reads, failures, and replica fallback.
+- `gateway_edge_cases_test.go` — contains focused gateway tests for stale metadata, multiple waiters, out-of-order phases, and indexing behavior.
+
+## Testing performed
+
+The test suite covers unit tests, edge-case tests, and end-to-end tests across all main packages.
+
+Areas tested:
+
+- protocol framing and gob payload handling
+- multiple messages on the same stream
+- truncated and malformed payloads
+- SSD append/read behavior
+- SSD LBA recovery after restart
+- binary values, empty values, and malformed block files
+- SSD injected failures
+- SSD client retry behavior
+- peer client Phase1/Phase2 sends
+- connection pool reuse/discard behavior
+- gateway PUT/GET behavior
+- peer metadata propagation
+- pending-write blocking and unblocking
+- failed-write cleanup
+- same-key writer convergence
+- stale metadata handling
+- out-of-order Phase1/Phase2 cases
+- replica fallback reads
+- devcluster helper functions and HTTP routes
+
+Run all tests:
+
+```powershell
+go test ./...
+```
+
+Run package-specific tests:
+
+```powershell
+go test ./cmd/devcluster -v
+go test ./internal/proto -v
+go test ./internal/ssd -v
+go test ./internal/transport -v
+go test ./internal/gateway -v
+```
+
+Expected final result:
+
+```text
+ok   github.com/KD0S-02/cs6983-messaging-protocol/cmd/devcluster
+ok   github.com/KD0S-02/cs6983-messaging-protocol/internal/gateway
+ok   github.com/KD0S-02/cs6983-messaging-protocol/internal/proto
+ok   github.com/KD0S-02/cs6983-messaging-protocol/internal/ssd
+ok   github.com/KD0S-02/cs6983-messaging-protocol/internal/transport
+```
+
+Some of the tests were originally written to expose bugs in the prototype. The fixes added afterward addressed these behaviors:
+
+- SSD client no longer retries server-side application errors as if they were network errors.
+- Failed writes now clear peer pending-write state.
+- Gateway reads can fall back to another replica.
+- Outstanding-write waiters are cleaned up correctly.
+- Out-of-order Phase messages and stale metadata are handled more safely.
+- Same-key writes converge using sequence number and gateway ID comparison.
 
 ## Formatting
 
@@ -224,118 +432,11 @@ Then rerun tests:
 go test ./...
 ```
 
-## Repository layout
-
-```text
-.
-├── cmd
-│   └── devcluster
-├── go.mod
-├── Makefile
-├── README.md
-└── internal
-    ├── gateway
-    ├── proto
-    ├── ssd
-    └── transport
-```
-
-The code is intended to be used by this module rather than directly imported by external modules. This is why the project makes use of `internal/` packages.
-
-## File map
-
-### Root
-
-- `go.mod` — module name and Go version for the project.
-- `Makefile` — placeholder make file for future project commands.
-- `README.md` — setup, run, test, and file guide for the project.
-
-### `cmd/devcluster`
-
-- `main.go` — Starts a local development cluster with SSD servers, gateway peer servers, and an HTTP API for testing PUT and GET requests.
-
-### `internal/proto`
-
-- `messages.go` — Contains the shared protocol structs for gateway phases, SSD reads/writes, and replica locations.
-- `framing.go` — Holds the TCP frame encoding/decoding using a 1-byte message type, 4-byte payload length, and gob payload.
-- `errors.go` — Contains the shared protocol-level errors.
-- `framing_test.go` — Holds the basic protocol round-trip tests and truncated payload checks.
-- `framing_edge_cases_test.go` — Holds the malformed payload, EOF, multiple-message stream, and gob encode error tests.
-
-### `internal/ssd`
-
-- `ssd.go` — Holds the file-backed SSD implementation with append, read, block files, and LBA recovery.
-- `server.go` — Contains the TCP server that exposes SSD append/read operations using the protocol package.
-- `config.go` — Holds the latency, jitter, and failure-injection settings for SSD operations.
-- `errors.go` — Holds the SSD-specific errors such as missing blocks and injected failures.
-- `ssd_test.go` — Contains the basic SSD append/read, restart recovery, and not-found tests.
-- `ssd_edge_cases_test.go` — Contains the binary data, empty values, concurrent appends, malformed blocks, and recovery edge cases.
-
-### `internal/transport`
-
-- `ssd_client.go` — Holds the gateway-side client for sending append/read requests to SSD servers.
-- `peer_client.go` — Holds the gateway-side client for sending Phase1 and Phase2 messages to peer gateways.
-- `pool.go` — Contains the small TCP connection pool helper.
-- `ssd_client_test.go` — Used to verify SSD client behavior around application-level errors.
-- `transport_edge_cases_test.go` — Contains the integration tests for SSD client/server traffic, reconnects, peer sends, and connection pool behavior.
-
-### `internal/gateway`
-
-- `gateway.go` — Holds the gateway struct, constructor, sequence counter, SSD clients, peer clients, index, and outstanding-write tracker.
-- `handler.go` — Used for PUT/GET handling, peer Phase1/Phase2 handling, failed-write cleanup, and replica fallback reads.
-- `index.go` — Contains the in-memory key-to-location index with version comparison using sequence number and gateway ID.
-- `outstanding.go` — Holds the pending-write tracking, waiter registration, completion handling, and timeout cleanup.
-- `peer_server.go` — Contains the TCP listener for incoming peer gateway messages.
-- `gateway_e2e_test.go` — Holds the end-to-end gateway tests for PUT/GET, peer propagation, pending reads, failures, and replica fallback.
-- `gateway_edge_cases_test.go` — Contains the focused gateway tests for stale metadata, multiple waiters, out-of-order phases, and indexing behavior.
-
-## Test coverage notes
-
-The tests written and covered in this RPC protocol are:
-
-- protocol framing and gob payload handling
-- SSD append/read and recovery behavior
-- SSD injected failures and malformed block files
-- SSD client retry behavior
-- peer client Phase1/Phase2 sends
-- connection pool behavior
-- gateway PUT/GET behavior
-- peer metadata propagation
-- pending-write blocking/unblocking
-- failed-write cleanup
-- same-key writer convergence
-- replica fallback reads
-
-## Running package-specific tests
-
-Protocol tests:
+The Makefile shortcut is:
 
 ```powershell
-go test ./internal/proto -v
-```
-
-SSD tests:
-
-```powershell
-go test ./internal/ssd -v
-```
-
-Transport tests:
-
-```powershell
-go test ./internal/transport -v
-```
-
-Gateway tests:
-
-```powershell
-go test ./internal/gateway -v
-```
-
-Devcluster compile check:
-
-```powershell
-go test ./cmd/devcluster
+make fmt
+make test
 ```
 
 ## Development workflow
@@ -343,30 +444,29 @@ go test ./cmd/devcluster
 A simple workflow for local changes:
 
 ```powershell
-cd C:\Users\prana\OneDrive\Desktop\CS6983-Messaging-Protocol
+cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
 
 git status
 
 gofmt -w internal/proto internal/ssd internal/transport internal/gateway cmd/devcluster
 go test ./...
 
-git add .
+git add README.md Makefile .gitignore cmd internal
 git commit -m "Describe your change"
-git push origin HEAD
+git pull --rebase origin main
+git push origin main
 ```
 
-If you only want to stage specific files, use `git add path/to/file.go` instead of `git add .`.
+If you only want to stage specific files, use `git add path/to/file.go` instead of adding a whole folder.
 
-## Git ignore note
+Do not commit local runtime data:
 
-The devcluster command writes local SSD block files under `data/`. Coverage commands can also create `coverage.out`.
-
-It is recommended to keep these out of Git:
-
-```gitignore
+```text
 data/
 coverage.out
 ```
+
+Those should be listed in `.gitignore`.
 
 ## Troubleshooting
 
@@ -379,7 +479,7 @@ The project declares its Go version in `go.mod`. If your installed Go version do
 Make sure you are running commands from the repository root:
 
 ```powershell
-cd C:\Users\prana\OneDrive\Desktop\CS6983-Messaging-Protocol
+cd C:\Users\OneDrive\Desktop\CS6983-Messaging-Protocol
 ```
 
 Then run:
@@ -388,49 +488,39 @@ Then run:
 go test ./...
 ```
 
-### Port `8080` gives HTML `404 Not Found` or `405 Method Not Allowed`
+### Port `8080` is already being used
 
-If you see an HTML response like this:
-
-```html
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-```
-
-then you are probably hitting another service on port `8080`, not this Go devcluster API. This project's API returns JSON errors, not that HTML page.
-
-Use port `18080` instead:
+The dev cluster can run on `18080`, which is the recommended local port for this README:
 
 ```powershell
 go run ./cmd/devcluster -http 127.0.0.1:18080
 ```
 
-Then test with:
-
-```powershell
-curl.exe http://127.0.0.1:18080/healthz
-```
-
-### `bind: An attempt was made to access a socket in a way forbidden by its access permissions`
-
-This means the port is already in use or blocked. The easiest fix is to run the HTTP API on port `18080`:
-
-```powershell
-go run ./cmd/devcluster -http 127.0.0.1:18080
-```
-
-To check what is using port `8080`, run:
+To check what is using port `8080`:
 
 ```powershell
 netstat -ano | findstr :8080
 ```
 
-The last number in the result is the process ID. To inspect it:
+To check port `18080`:
 
 ```powershell
-tasklist /FI "PID eq 12345"
+netstat -ano | findstr :18080
 ```
 
-Replace `12345` with the actual process ID from `netstat`.
+### `curl` returns an HTML 404 or 405 page
+
+If the response starts with something like this:
+
+```html
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+```
+
+then you are probably hitting another service, not this Go dev cluster. Make sure the dev cluster is running and that your `curl.exe` command uses the same port:
+
+```powershell
+curl.exe http://127.0.0.1:18080/healthz
+```
 
 ### Tests hang or fail around networking
 
@@ -441,3 +531,20 @@ go test ./internal/gateway -v
 ```
 
 If needed, run one test at a time with `-run`.
+
+### `data/` appears in `git status`
+
+The dev cluster writes local SSD block files under `data/`. These are runtime files and should not be committed.
+
+Add this to `.gitignore`:
+
+```gitignore
+data/
+coverage.out
+```
+
+If `data/` was staged accidentally:
+
+```powershell
+git restore --staged data/
+```
